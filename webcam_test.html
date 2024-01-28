@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <title>OpenCV Sample</title>
+</head>
+
+<body>
+  <div>
+    <button id="startAndStop">Start</button>
+  </div>
+  <div>
+    <video id="videoInput" width="320" height="240"></video>
+    <canvas id="canvasOutput" width="320" height="240"></canvas>
+  </div>
+  <!-- <script async src="https://docs.opencv.org/master/opencv.js"></script> -->
+  <!-- https://github.com/opencv/opencv/releases/download/4.9.0/opencv-4.9.0-docs.zip -->
+  <script src="opencv-4.9.0.js"></script>
+  <script>
+    cv['onRuntimeInitialized'] = () => {
+      // ref. https://docs.opencv.org/3.4/dd/d00/tutorial_js_video_display.html
+      let streaming = false;
+      let video = document.getElementById("videoInput"); // video is the id of video tag
+      let startAndStop = document.getElementById('startAndStop');
+      let canvasOutput = document.getElementById('canvasOutput');
+      let canvasContext = canvasOutput.getContext('2d');
+      let src = new cv.Mat(video.height, video.width, cv.CV_8UC4);
+      let dst = new cv.Mat(video.height, video.width, cv.CV_8UC4);
+      let cap = new cv.VideoCapture(video);
+      startAndStop.addEventListener('click', () => {
+        if (!streaming) {
+          onVideoStarted();
+        } else {
+          onVideoStopped();
+        }
+      });
+
+      let timeoutID;
+      function onVideoStarted() {
+        const constraints = {
+          audio: false,
+          video: {
+            // facingMode: { exact: "environment" },
+            width: 640,
+            height: 480
+          }
+        };
+        navigator.mediaDevices.getUserMedia(constraints)
+          .then(async function (stream) {
+            video.srcObject = stream;
+            await video.play();
+          })
+          .then(function () {
+            streaming = true;
+            startAndStop.innerText = 'Stop';
+            // schedule the first one.
+            timeoutID = setTimeout(processVideo, 0);
+          })
+          .catch(function (err) {
+            console.log("An error occurred! " + err);
+          });
+      }
+
+      function onVideoStopped() {
+        const stream = video.srcObject;
+        if (stream) {
+          const tracks = stream.getTracks();
+          tracks.forEach(function (track) {
+            // stopping every track
+            track.stop();
+          });
+        }
+        video.srcObject = null;
+        streaming = false;
+        clearTimeout(timeoutID);
+        canvasContext.clearRect(0, 0, canvasOutput.width, canvasOutput.height);
+        startAndStop.innerText = 'Start';
+      }
+
+      const FPS = 30;
+      function processVideo() {
+        try {
+          if (!streaming) {
+            // clean and stop.
+            // src.delete();
+            // dst.delete();
+            return;
+          }
+          let begin = Date.now();
+          // start processing.
+          cap.read(src);
+          src.copyTo(dst);
+          cv.imshow('canvasOutput', dst);
+          // schedule the next one.
+          let delay = 1000 / FPS - (Date.now() - begin);
+          setTimeout(processVideo, delay);
+        } catch (err) {
+          console.log(err);
+        }
+      };
+    };
+  </script>
+</body>
+
+</html>
